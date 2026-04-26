@@ -1,16 +1,17 @@
-import telebot
-from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
+import os
+import logging
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, 8716461364:AAFk92sxvI-L_3kqcOhd_UFmYRZcUXMJL-g
 import json
 import requests
 
-# ========== আপনার বোট টোকেন এখানে দিন ==========
-BOT_TOKEN = "8716461364:AAFk92sxvI-L_3kqcOhd_UFmYRZcUXMJL-g"
-bot = telebot.TeleBot(BOT_TOKEN)
+logging.basicConfig(level=logging.INFO)
+BOT_TOKEN = os.environ.get("8716461364:AAFk92sxvI-L_3kqcOhd_UFmYRZcUXMJL-g", "")
 
-# ========== অনলাইন থেকে সম্পূর্ণ কুরআন আনার API (ইন্টারনেট লাগবে) ==========
-# বিনামূল্যে ও সম্পূর্ণ কুরআনের API - বাংলা অর্থ ও উচ্চারণসহ
+# ============================================================
+# সূরা ও আয়াতের জন্য বাংলা নাম (সব সূরা)
+# ============================================================
 
-# Surah names in Bangla (সব সূরা)
 surah_bangla_names = {
     1: "আল-ফাতিহা", 2: "আল-বাকারাহ", 3: "আল-ইমরান", 4: "আন-নিসা", 5: "আল-মায়িদাহ",
     6: "আল-আনআম", 7: "আল-আরাফ", 8: "আল-আনফাল", 9: "আত-তাওবাহ", 10: "ইউনুস",
@@ -37,170 +38,269 @@ surah_bangla_names = {
     111: "আল-লাহাব", 112: "আল-ইখলাস", 113: "আল-ফালাক", 114: "আন-নাস"
 }
 
-# ব্যবহারকারীর অবস্থান ট্র্যাক করা
-user_state = {}
+# আয়াত সংখ্যা (প্রতি সূরার)
+surah_ayah_count = {
+    1:7, 2:286, 3:200, 4:176, 5:120, 6:165, 7:206, 8:75, 9:129, 10:109,
+    11:123, 12:111, 13:43, 14:52, 15:99, 16:128, 17:111, 18:110, 19:98, 20:135,
+    21:112, 22:78, 23:118, 24:64, 25:77, 26:227, 27:93, 28:88, 29:69, 30:60,
+    31:34, 32:30, 33:73, 34:54, 35:45, 36:83, 37:182, 38:88, 39:75, 40:85,
+    41:54, 42:53, 43:89, 44:59, 45:37, 46:35, 47:38, 48:29, 49:18, 50:45,
+    51:60, 52:49, 53:62, 54:55, 55:78, 56:96, 57:29, 58:22, 59:24, 60:13,
+    61:14, 62:11, 63:11, 64:18, 65:12, 66:12, 67:30, 68:52, 69:52, 70:44,
+    71:28, 72:28, 73:20, 74:56, 75:40, 76:31, 77:50, 78:40, 79:46, 80:42,
+    81:29, 82:19, 83:36, 84:25, 85:22, 86:17, 87:19, 88:26, 89:30, 90:20,
+    91:15, 92:21, 93:11, 94:8, 95:8, 96:19, 97:5, 98:8, 99:8, 100:11,
+    101:11, 102:8, 103:3, 104:9, 105:5, 106:4, 107:7, 108:3, 109:6, 110:3,
+    111:5, 112:4, 113:5, 114:6
+}
+
+# ব্যবহারকারীর ডাটা
+user_store = {}
+
+def get_user(uid):
+    if uid not in user_store:
+        user_store[uid] = {"surah": 1, "ayah": 1}
+    return user_store[uid]
 
 def get_ayah_text(surah_num, ayah_num):
-    """API থেকে আরবি, উচ্চারণ ও অর্থ নিয়ে আসে"""
+    """API থেকে আরবি ও বাংলা অর্থ আনে"""
     try:
-        # আরবি টেক্সট
+        # আরবি
         ar_url = f"https://api.alquran.cloud/v1/ayah/{surah_num}:{ayah_num}/editions/quran-simple"
-        ar_response = requests.get(ar_url).json()
+        ar_response = requests.get(ar_url, timeout=10).json()
         arabic = ar_response['data'][0]['text']
-
-        # বাংলা অনুবাদ (বাংলা উচ্চারণের জন্য আলাদা API নেই, তাই অর্থই দেখাব)
+        
+        # বাংলা অর্থ
         bn_url = f"https://api.alquran.cloud/v1/ayah/{surah_num}:{ayah_num}/bn.bengali"
-        bn_response = requests.get(bn_url).json()
-        bangla_meaning = bn_response['data']['text']
-
-        return arabic, bangla_meaning
-    except:
-        return "আয়াত পাওয়া যায়নি", "ত্রুটি"
-
-@bot.message_handler(commands=['start'])
-def send_welcome(message):
-    user_id = message.chat.id
-    user_state[user_id] = {"surah": 1, "ayah": 1}
-    
-    welcome_text = """📖 **পবিত্র কুরআন - টেলিগ্রাম বোর্ড** 📖
-
-আসসালামু আলাইকুম! এই বোটের মাধ্যমে আপনি সম্পূর্ণ কুরআন পড়তে পারবেন।
-
-**কমান্ডসমূহ:**
-/start - বোট চালু করা
-/help - সাহায্য
-/surah - সূরা পরিবর্তন
-/ayah আয়াত নং - সরাসরি আয়াতে যান (যেমন: /ayah 2:255)
-
-**নিচের বাটন ব্যবহার করুন:**"""
-    
-    markup = InlineKeyboardMarkup()
-    markup.row(
-        InlineKeyboardButton("◀ পিছনের আয়াত", callback_data="prev_ayah"),
-        InlineKeyboardButton("পরবর্তী আয়াত ▶", callback_data="next_ayah")
-    )
-    markup.row(
-        InlineKeyboardButton("🔄 সূরা পরিবর্তন", callback_data="change_surah"),
-        InlineKeyboardButton("🔍 আয়াত খুঁজুন", callback_data="search_ayah")
-    )
-    
-    bot.send_message(user_id, welcome_text, parse_mode='Markdown', reply_markup=markup)
-    show_ayah(user_id)
-
-def show_ayah(user_id):
-    """বর্তমান সূরা ও আয়াত দেখায়"""
-    state = user_state.get(user_id, {"surah": 1, "ayah": 1})
-    surah = state["surah"]
-    ayah = state["ayah"]
-    
-    arabic, bangla = get_ayah_text(surah, ayah)
-    
-    msg = f"""📌 **সূরা {surah_bangla_names.get(surah, surah)} : আয়াত {ayah}**
-
-🔹 **আরবি:**
-{arabic}
-
-🔸 **বাংলা অর্থ:**
-{bangla}
-
-〰️〰️〰️〰️〰️〰️〰️
-📖 {surah}/{surah_bangla_names.get(surah, surah)} : {ayah}"""
-    
-    markup = InlineKeyboardMarkup()
-    markup.row(
-        InlineKeyboardButton("◀ পিছন", callback_data="prev_ayah"),
-        InlineKeyboardButton("পরবর্তী ▶", callback_data="next_ayah")
-    )
-    markup.row(
-        InlineKeyboardButton("🔄 সূরা পাল্টান", callback_data="change_surah"),
-        InlineKeyboardButton("🔍 আয়াত সার্চ", callback_data="search_ayah")
-    )
-    
-    bot.edit_message_text(msg, user_id, message_id=None, parse_mode='Markdown', reply_markup=markup)
-
-@bot.callback_query_handler(func=lambda call: True)
-def handle_callback(call):
-    user_id = call.message.chat.id
-    
-    if call.data == "prev_ayah":
-        state = user_state.get(user_id, {"surah": 1, "ayah": 1})
-        if state["ayah"] > 1:
-            state["ayah"] -= 1
-        elif state["surah"] > 1:
-            state["surah"] -= 1
-            state["ayah"] = 1  # আগের সূরার ১ম আয়াত (সরলীকৃত)
-        user_state[user_id] = state
-        show_ayah(user_id)
+        bn_response = requests.get(bn_url, timeout=10).json()
+        bangla = bn_response['data']['text']
         
-    elif call.data == "next_ayah":
-        state = user_state.get(user_id, {"surah": 1, "ayah": 1})
-        state["ayah"] += 1
-        if state["ayah"] > 7:  # প্রতিটি সূরার আয়াত সংখ্যা ভিন্ন, সরলীকৃত
-            state["ayah"] = 1
-            if state["surah"] < 114:
-                state["surah"] += 1
-        user_state[user_id] = state
-        show_ayah(user_id)
-        
-    elif call.data == "change_surah":
-        msg = "সূরা নম্বর লিখুন (1-114):\nযেমন: 112 লিখলে সূরা ইখলাস দেখাবে"
-        bot.send_message(user_id, msg)
-        bot.register_next_step_handler(call.message, set_surah)
-        
-    elif call.data == "search_ayah":
-        msg = "আয়াত নং লিখুন (সূরা:আয়াত ফরম্যাটে)\nযেমন: 1:1 বা 112:2"
-        bot.send_message(user_id, msg)
-        bot.register_next_step_handler(call.message, search_ayah)
+        return arabic, bangla
+    except Exception as e:
+        return "আয়াত পাওয়া যায়নি", "সংযোগ ত্রুটি, আবার চেষ্টা করুন"
 
-def set_surah(message):
-    user_id = message.chat.id
-    try:
-        surah_num = int(message.text.strip())
-        if 1 <= surah_num <= 114:
-            user_state[user_id] = {"surah": surah_num, "ayah": 1}
-            show_ayah(user_id)
-        else:
-            bot.send_message(user_id, "সূরা 1 থেকে 114 এর মধ্যে লিখুন।")
-    except:
-        bot.send_message(user_id, "সঠিক সূরা নম্বর লিখুন (শুধু সংখ্যা)")
+def get_ayah_buttons(surah, ayah):
+    return InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("◀ পিছন", callback_data=f"prev_{surah}_{ayah}"),
+            InlineKeyboardButton("পরবর্তী ▶", callback_data=f"next_{surah}_{ayah}")
+        ],
+        [
+            InlineKeyboardButton("🔄 সূরা পাল্টান", callback_data="change_surah"),
+            InlineKeyboardButton("🔍 আয়াত সার্চ", callback_data="search_ayah")
+        ],
+        [InlineKeyboardButton("🏠 মেনুতে ফিরুন", callback_data="main_menu")]
+    ])
 
-def search_ayah(message):
-    user_id = message.chat.id
-    text = message.text.strip()
-    try:
-        if ":" in text:
-            surah, ayah = text.split(":")
-            surah = int(surah)
-            ayah = int(ayah)
-            if 1 <= surah <= 114 and ayah >= 1:
-                user_state[user_id] = {"surah": surah, "ayah": ayah}
-                show_ayah(user_id)
-                return
-        bot.send_message(user_id, "ভুল ফরম্যাট! সঠিক উদাহরণ: 2:255")
-    except:
-        bot.send_message(user_id, "ত্রুটি! ফরম্যাট: সূরা:আয়াত (যেমন 112:2)")
+def main_menu_keyboard():
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("📖 কুরআন পড়ুন", callback_data="read_quran")],
+        [InlineKeyboardButton("🔄 সূরা পরিবর্তন", callback_data="change_surah")],
+        [InlineKeyboardButton("🔍 আয়াত খুঁজুন", callback_data="search_ayah")]
+    ])
 
-@bot.message_handler(commands=['help'])
-def help_command(message):
-    help_text = """📖 **কুরআন বোট সাহায্য**
+# ============================================================
+# হ্যান্ডলার
+# ============================================================
 
-/start - বোট চালু করুন
-/help - এই সাহায্য দেখুন
-/surah [নম্বর] - সূরা পরিবর্তন (যেমন: /surah 112)
-/ayah [সূরা:আয়াত] - সরাসরি আয়াতে যান
+async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    name = update.effective_user.first_name
+    await update.message.reply_text(
+        f"📖 আসসালামু আলাইকুম, {name}!\n\n"
+        f"পবিত্র কুরআন টেলিগ্রাম বোটে স্বাগতম।\n\n"
+        f"নিচের মেনু থেকে কুরআন পড়া শুরু করুন।",
+        parse_mode="Markdown",
+        reply_markup=main_menu_keyboard()
+    )
 
-**বাটনসমূহ:**
-◀ পিছনের আয়াত
-পরবর্তী আয়াত ▶
-🔄 সূরা পরিবর্তন
-🔍 আয়াত সার্চ
-
-**উদাহরণ:**
-আয়াতুল কুরসি পড়তে /ayah 2:255 লিখুন
-সূরা ইখলাস পড়তে /surah 112 লিখুন"""
+async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    user_id = query.from_user.id
+    user = get_user(user_id)
     
-    bot.send_message(message.chat.id, help_text, parse_mode='Markdown')
+    data = query.data
+    
+    # মেনুতে ফেরা
+    if data == "main_menu":
+        await query.edit_message_text(
+            "📖 *পবিত্র কুরআন বোট*\n\nনিচের অপশন বেছে নিন:",
+            parse_mode="Markdown",
+            reply_markup=main_menu_keyboard()
+        )
+        return
+    
+    # কুরআন পড়া শুরু বা চালু রাখা
+    if data == "read_quran":
+        surah = user["surah"]
+        ayah = user["ayah"]
+        arabic, bangla = get_ayah_text(surah, ayah)
+        
+        msg = f"📌 *সূরা {surah_bangla_names.get(surah, surah)} : আয়াত {ayah}*\n\n"
+        msg += f"🔹 *আরবি:*\n{arabic}\n\n"
+        msg += f"🔸 *বাংলা অর্থ:*\n{bangla}"
+        
+        await query.edit_message_text(
+            msg,
+            parse_mode="Markdown",
+            reply_markup=get_ayah_buttons(surah, ayah)
+        )
+        return
+    
+    # পিছনের আয়াত
+    if data.startswith("prev_"):
+        parts = data.split("_")
+        surah = int(parts[1])
+        ayah = int(parts[2])
+        
+        if ayah > 1:
+            ayah -= 1
+        elif surah > 1:
+            surah -= 1
+            ayah = surah_ayah_count.get(surah, 7)
+        
+        user["surah"] = surah
+        user["ayah"] = ayah
+        
+        arabic, bangla = get_ayah_text(surah, ayah)
+        msg = f"📌 *সূরা {surah_bangla_names.get(surah, surah)} : আয়াত {ayah}*\n\n"
+        msg += f"🔹 *আরবি:*\n{arabic}\n\n"
+        msg += f"🔸 *বাংলা অর্থ:*\n{bangla}"
+        
+        await query.edit_message_text(
+            msg,
+            parse_mode="Markdown",
+            reply_markup=get_ayah_buttons(surah, ayah)
+        )
+        return
+    
+    # পরবর্তী আয়াত
+    if data.startswith("next_"):
+        parts = data.split("_")
+        surah = int(parts[1])
+        ayah = int(parts[2])
+        max_ayah = surah_ayah_count.get(surah, 7)
+        
+        if ayah < max_ayah:
+            ayah += 1
+        elif surah < 114:
+            surah += 1
+            ayah = 1
+        
+        user["surah"] = surah
+        user["ayah"] = ayah
+        
+        arabic, bangla = get_ayah_text(surah, ayah)
+        msg = f"📌 *সূরা {surah_bangla_names.get(surah, surah)} : আয়াত {ayah}*\n\n"
+        msg += f"🔹 *আরবি:*\n{arabic}\n\n"
+        msg += f"🔸 *বাংলা অর্থ:*\n{bangla}"
+        
+        await query.edit_message_text(
+            msg,
+            parse_mode="Markdown",
+            reply_markup=get_ayah_buttons(surah, ayah)
+        )
+        return
+    
+    # সূরা পরিবর্তন
+    if data == "change_surah":
+        msg = "সূরা নম্বর লিখুন (1-114):\nউদাহরণ: 112 লিখলে সূরা ইখলাস দেখাবে"
+        await query.edit_message_text(
+            msg,
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🏠 বাতিল", callback_data="main_menu")]])
+        )
+        context.user_data['waiting_for_surah'] = True
+        return
+    
+    # আয়াত সার্চ
+    if data == "search_ayah":
+        msg = "আয়াত নং লিখুন (সূরা:আয়াত ফরম্যাটে)\nউদাহরণ: 2:255 বা 112:2"
+        await query.edit_message_text(
+            msg,
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🏠 বাতিল", callback_data="main_menu")]])
+        )
+        context.user_data['waiting_for_ayah'] = True
+        return
 
-# বোট চালু করুন
-print("বোট চালু হচ্ছে...")
-bot.infinity_polling()
+async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    text = update.message.text.strip()
+    user = get_user(user_id)
+    
+    # সূরা নম্বর ইনপুট
+    if context.user_data.get('waiting_for_surah'):
+        context.user_data['waiting_for_surah'] = False
+        try:
+            surah = int(text)
+            if 1 <= surah <= 114:
+                user["surah"] = surah
+                user["ayah"] = 1
+                
+                arabic, bangla = get_ayah_text(surah, 1)
+                msg = f"📌 *সূরা {surah_bangla_names.get(surah, surah)} : আয়াত 1*\n\n"
+                msg += f"🔹 *আরবি:*\n{arabic}\n\n"
+                msg += f"🔸 *বাংলা অর্থ:*\n{bangla}"
+                
+                await update.message.reply_text(
+                    msg,
+                    parse_mode="Markdown",
+                    reply_markup=get_ayah_buttons(surah, 1)
+                )
+            else:
+                await update.message.reply_text("❌ সূরা 1 থেকে 114 এর মধ্যে লিখুন।")
+        except:
+            await update.message.reply_text("❌ সঠিক সূরা নম্বর লিখুন (শুধু সংখ্যা)")
+        return
+    
+    # আয়াত সার্চ ইনপুট
+    if context.user_data.get('waiting_for_ayah'):
+        context.user_data['waiting_for_ayah'] = False
+        try:
+            if ":" in text:
+                surah, ayah = text.split(":")
+                surah = int(surah)
+                ayah = int(ayah)
+                if 1 <= surah <= 114 and ayah >= 1:
+                    max_ayah = surah_ayah_count.get(surah, 7)
+                    if ayah <= max_ayah:
+                        user["surah"] = surah
+                        user["ayah"] = ayah
+                        
+                        arabic, bangla = get_ayah_text(surah, ayah)
+                        msg = f"📌 *সূরা {surah_bangla_names.get(surah, surah)} : আয়াত {ayah}*\n\n"
+                        msg += f"🔹 *আরবি:*\n{arabic}\n\n"
+                        msg += f"🔸 *বাংলা অর্থ:*\n{bangla}"
+                        
+                        await update.message.reply_text(
+                            msg,
+                            parse_mode="Markdown",
+                            reply_markup=get_ayah_buttons(surah, ayah)
+                        )
+                    else:
+                        await update.message.reply_text(f"❌ সূরা {surah} -তে {max_ayah}টি আয়াত আছে।")
+                else:
+                    await update.message.reply_text("❌ সঠিক ফরম্যাট: সূরা:আয়াত (যেমন: 2:255)")
+            else:
+                await update.message.reply_text("❌ ফরম্যাট: সূরা:আয়াত (যেমন: 112:2)")
+        except:
+            await update.message.reply_text("❌ ত্রুটি! সঠিক ফরম্যাট: সূরা:আয়াত")
+        return
+    
+    # অন্য যেকোনো টেক্সট
+    await update.message.reply_text(
+        "👇 মেনু থেকে অপশন বেছে নিন:",
+        reply_markup=main_menu_keyboard()
+    )
+
+def main():
+    app = Application.builder().token(BOT_TOKEN).build()
+    app.add_handler(CommandHandler("start", start_command))
+    app.add_handler(CallbackQueryHandler(callback))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
+    
+    print("🤖 কুরআন বোট চালু হয়েছে!")
+    print("টোকেন:", BOT_TOKEN[:20] + "...")
+    app.run_polling(allowed_updates=Update.ALL_TYPES)
+
+if __name__ == '__main__':
+    main()
