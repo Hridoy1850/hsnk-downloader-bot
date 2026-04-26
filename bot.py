@@ -371,8 +371,8 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "`1:1` — সূরা ফাতিহার ১ম আয়াত\n"
             "`112:1` — সূরা ইখলাস",
             parse_mode="Markdown",
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🏠 মেনু", callback_data="menu")]]])
-        )
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🏠 মেনু", callback_data="menu")]]))
+
 
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
