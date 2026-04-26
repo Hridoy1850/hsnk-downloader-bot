@@ -1,295 +1,427 @@
 import os
 import logging
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, 8716461364:AAFk92sxvI-L_3kqcOhd_UFmYRZcUXMJL-g
-import json
 import requests
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
 
 logging.basicConfig(level=logging.INFO)
-BOT_TOKEN = os.environ.get("8716461364:AAFk92sxvI-L_3kqcOhd_UFmYRZcUXMJL-g", "")
+BOT_TOKEN = os.environ.get("BOT_TOKEN", "")
 
 # ============================================================
-# সূরা ও আয়াতের জন্য বাংলা নাম (সব সূরা)
+# সূরার তালিকা
 # ============================================================
 
-surah_bangla_names = {
-    1: "আল-ফাতিহা", 2: "আল-বাকারাহ", 3: "আল-ইমরান", 4: "আন-নিসা", 5: "আল-মায়িদাহ",
-    6: "আল-আনআম", 7: "আল-আরাফ", 8: "আল-আনফাল", 9: "আত-তাওবাহ", 10: "ইউনুস",
-    11: "হুদ", 12: "ইউসুফ", 13: "আর-রাদ", 14: "ইব্রাহীম", 15: "আল-হিজর",
-    16: "আন-নাহল", 17: "বনী ইসরাঈল", 18: "আল-কাহফ", 19: "মারইয়াম", 20: "ত্বোয়া-হা",
-    21: "আল-আম্বিয়া", 22: "আল-হাজ্জ", 23: "আল-মুমিনুন", 24: "আন-নূর", 25: "আল-ফুরকান",
-    26: "আশ-শুআরা", 27: "আন-নামল", 28: "আল-কাসাস", 29: "আল-আনকাবুত", 30: "আর-রুম",
-    31: "লুকমান", 32: "আস-সাজদাহ", 33: "আল-আহযাব", 34: "সাবা", 35: "ফাতির",
-    36: "ইয়াসীন", 37: "আস-সাফফাত", 38: "সোয়াদ", 39: "আজ-জুমার", 40: "গাফির",
-    41: "হা-মীম", 42: "আশ-শূরা", 43: "আয-যুখরুফ", 44: "আদ-দোখান", 45: "আল-জাসিয়াহ",
-    46: "আল-আহক্বাফ", 47: "মুহাম্মদ", 48: "আল-ফাতহ", 49: "আল-হুজুরাত", 50: "ক্বাফ",
-    51: "আয-যারিয়াত", 52: "আত-তূর", 53: "আন-নাজম", 54: "আল-ক্বামার", 55: "আর-রাহমান",
-    56: "আল-ওয়াকিয়াহ", 57: "আল-হাদিদ", 58: "আল-মুজাদালাহ", 59: "আল-হাশর", 60: "আল-মুমতাহিনাহ",
-    61: "আস-সাফ", 62: "আল-জুমুআ", 63: "আল-মুনাফিকুন", 64: "আত-তাগাবুন", 65: "আত-তালাক",
-    66: "আত-তাহরীম", 67: "আল-মুলক", 68: "আল-কালাম", 69: "আল-হাক্কাহ", 70: "আল-মাআরিজ",
-    71: "নূহ", 72: "আল-জ্বিন", 73: "আল-মুযযাম্মিল", 74: "আল-মুদ্দাসসির", 75: "আল-ক্বিয়ামাহ",
-    76: "আদ-দাহর", 77: "আল-মুরসালাত", 78: "আন-নাবা", 79: "আন-নাযিয়াত", 80: "আবাসা",
-    81: "আত-তাকভীর", 82: "আল-ইনফিতার", 83: "আল-মুত্বাফফিফীন", 84: "আল-ইনশিকাক", 85: "আল-বুরুজ",
-    86: "আত-তারিক্ব", 87: "আল-আ’লা", 88: "আল-গাশিয়াহ", 89: "আল-ফাজর", 90: "আল-বালাদ",
-    91: "আশ-শামস", 92: "আল-লাইল", 93: "আদ-দুহা", 94: "আল-ইনশিরাহ", 95: "আত-তীন",
-    96: "আল-আলাক", 97: "আল-ক্বদর", 98: "আল-বাইয়্যিনাহ", 99: "আজ-যিলযাল", 100: "আল-আদিয়াত",
-    101: "আল-কারিয়াহ", 102: "আত-তাকাসুর", 103: "আল-আসর", 104: "আল-হুমাজাহ", 105: "আল-ফীল",
-    106: "কুরাইশ", 107: "আল-মাউন", 108: "আল-কাওসার", 109: "আল-কাফিরুন", 110: "আন-নাসর",
-    111: "আল-লাহাব", 112: "আল-ইখলাস", 113: "আল-ফালাক", 114: "আন-নাস"
-}
+SURAHS = [
+    (1,"আল-ফাতিহা","الفاتحة",7),(2,"আল-বাকারা","البقرة",286),(3,"আল-ইমরান","آل عمران",200),
+    (4,"আন-নিসা","النساء",176),(5,"আল-মায়িদা","المائدة",120),(6,"আল-আনআম","الأنعام",165),
+    (7,"আল-আরাফ","الأعراف",206),(8,"আল-আনফাল","الأنفال",75),(9,"আত-তাওবা","التوبة",129),
+    (10,"ইউনুস","يونس",109),(11,"হুদ","هود",123),(12,"ইউসুফ","يوسف",111),
+    (13,"আর-রাদ","الرعد",43),(14,"ইবরাহিম","إبراهيم",52),(15,"আল-হিজর","الحجر",99),
+    (16,"আন-নাহল","النحل",128),(17,"আল-ইসরা","الإسراء",111),(18,"আল-কাহফ","الكهف",110),
+    (19,"মারইয়াম","مريم",98),(20,"ত্বাহা","طه",135),(21,"আল-আম্বিয়া","الأنبياء",112),
+    (22,"আল-হজ্জ","الحج",78),(23,"আল-মুমিনুন","المؤمنون",118),(24,"আন-নূর","النور",64),
+    (25,"আল-ফুরকান","الفرقان",77),(26,"আশ-শুআরা","الشعراء",227),(27,"আন-নামল","النمل",93),
+    (28,"আল-কাসাস","القصص",88),(29,"আল-আনকাবুত","العنكبوت",69),(30,"আর-রুম","الروم",60),
+    (31,"লুকমান","لقمان",34),(32,"আস-সাজদা","السجدة",30),(33,"আল-আহযাব","الأحزاب",73),
+    (34,"সাবা","سبأ",54),(35,"ফাতির","فاطر",45),(36,"ইয়া-সিন","يس",83),
+    (37,"আস-সাফফাত","الصافات",182),(38,"সোয়াদ","ص",88),(39,"আয-যুমার","الزمر",75),
+    (40,"গাফির","غافر",85),(41,"ফুসসিলাত","فصلت",54),(42,"আশ-শুরা","الشورى",53),
+    (43,"আয-যুখরুফ","الزخرف",89),(44,"আদ-দুখান","الدخان",59),(45,"আল-জাসিয়া","الجاثية",37),
+    (46,"আল-আহকাফ","الأحقاف",35),(47,"মুহাম্মদ","محمد",38),(48,"আল-ফাতহ","الفتح",29),
+    (49,"আল-হুজুরাত","الحجرات",18),(50,"কাফ","ق",45),(51,"আয-যারিয়াত","الذاريات",60),
+    (52,"আত-তুর","الطور",49),(53,"আন-নাজম","النجم",62),(54,"আল-কামার","القمر",55),
+    (55,"আর-রাহমান","الرحمن",78),(56,"আল-ওয়াকিয়া","الواقعة",96),(57,"আল-হাদিদ","الحديد",29),
+    (58,"আল-মুজাদালা","المجادلة",22),(59,"আল-হাশর","الحشر",24),(60,"আল-মুমতাহানা","الممتحنة",13),
+    (61,"আস-সাফ","الصف",14),(62,"আল-জুমুআ","الجمعة",11),(63,"আল-মুনাফিকুন","المنافقون",11),
+    (64,"আত-তাগাবুন","التغابن",18),(65,"আত-তালাক","الطلاق",12),(66,"আত-তাহরিম","التحريم",12),
+    (67,"আল-মুলক","الملك",30),(68,"আল-কালাম","القلم",52),(69,"আল-হাককা","الحاقة",52),
+    (70,"আল-মাআরিজ","المعارج",44),(71,"নূহ","نوح",28),(72,"আল-জিন","الجن",28),
+    (73,"আল-মুযযাম্মিল","المزمل",20),(74,"আল-মুদ্দাস্সির","المدثر",56),(75,"আল-কিয়ামা","القيامة",40),
+    (76,"আল-ইনসান","الإنسان",31),(77,"আল-মুরসালাত","المرسلات",50),(78,"আন-নাবা","النبأ",40),
+    (79,"আন-নাযিআত","النازعات",46),(80,"আবাসা","عبس",42),(81,"আত-তাকভির","التكوير",29),
+    (82,"আল-ইনফিতার","الانفطار",19),(83,"আল-মুতাফফিফিন","المطففين",36),(84,"আল-ইনশিকাক","الانشقاق",25),
+    (85,"আল-বুরুজ","البروج",22),(86,"আত-তারিক","الطارق",17),(87,"আল-আলা","الأعلى",19),
+    (88,"আল-গাশিয়া","الغاشية",26),(89,"আল-ফাজর","الفجر",30),(90,"আল-বালাদ","البلد",20),
+    (91,"আশ-শামস","الشمس",15),(92,"আল-লাইল","الليل",21),(93,"আদ-দুহা","الضحى",11),
+    (94,"আশ-শারহ","الشرح",8),(95,"আত-তিন","التين",8),(96,"আল-আলাক","العلق",19),
+    (97,"আল-কাদর","القدر",5),(98,"আল-বাইয়িনা","البينة",8),(99,"আয-যালযালা","الزلزلة",8),
+    (100,"আল-আদিয়াত","العاديات",11),(101,"আল-কারিআ","القارعة",11),(102,"আত-তাকাসুর","التكاثر",8),
+    (103,"আল-আসর","العصر",3),(104,"আল-হুমাযা","الهمزة",9),(105,"আল-ফিল","الفيل",5),
+    (106,"কুরাইশ","قريش",4),(107,"আল-মাউন","الماعون",7),(108,"আল-কাউসার","الكوثر",3),
+    (109,"আল-কাফিরুন","الكافرون",6),(110,"আন-নাসর","النصر",3),(111,"আল-মাসাদ","المسد",5),
+    (112,"আল-ইখলাস","الإخلاص",4),(113,"আল-ফালাক","الفلق",5),(114,"আন-নাস","الناس",6),
+]
 
-# আয়াত সংখ্যা (প্রতি সূরার)
-surah_ayah_count = {
-    1:7, 2:286, 3:200, 4:176, 5:120, 6:165, 7:206, 8:75, 9:129, 10:109,
-    11:123, 12:111, 13:43, 14:52, 15:99, 16:128, 17:111, 18:110, 19:98, 20:135,
-    21:112, 22:78, 23:118, 24:64, 25:77, 26:227, 27:93, 28:88, 29:69, 30:60,
-    31:34, 32:30, 33:73, 34:54, 35:45, 36:83, 37:182, 38:88, 39:75, 40:85,
-    41:54, 42:53, 43:89, 44:59, 45:37, 46:35, 47:38, 48:29, 49:18, 50:45,
-    51:60, 52:49, 53:62, 54:55, 55:78, 56:96, 57:29, 58:22, 59:24, 60:13,
-    61:14, 62:11, 63:11, 64:18, 65:12, 66:12, 67:30, 68:52, 69:52, 70:44,
-    71:28, 72:28, 73:20, 74:56, 75:40, 76:31, 77:50, 78:40, 79:46, 80:42,
-    81:29, 82:19, 83:36, 84:25, 85:22, 86:17, 87:19, 88:26, 89:30, 90:20,
-    91:15, 92:21, 93:11, 94:8, 95:8, 96:19, 97:5, 98:8, 99:8, 100:11,
-    101:11, 102:8, 103:3, 104:9, 105:5, 106:4, 107:7, 108:3, 109:6, 110:3,
-    111:5, 112:4, 113:5, 114:6
-}
+# ============================================================
+# API ফাংশন
+# ============================================================
 
-# ব্যবহারকারীর ডাটা
-user_store = {}
-
-def get_user(uid):
-    if uid not in user_store:
-        user_store[uid] = {"surah": 1, "ayah": 1}
-    return user_store[uid]
-
-def get_ayah_text(surah_num, ayah_num):
-    """API থেকে আরবি ও বাংলা অর্থ আনে"""
+def get_ayah(surah_num, ayah_num):
+    """আরবি, বাংলা অর্থ ও উচ্চারণ আনো"""
     try:
         # আরবি
-        ar_url = f"https://api.alquran.cloud/v1/ayah/{surah_num}:{ayah_num}/editions/quran-simple"
-        ar_response = requests.get(ar_url, timeout=10).json()
-        arabic = ar_response['data'][0]['text']
-        
+        arabic_url = f"https://api.alquran.cloud/v1/ayah/{surah_num}:{ayah_num}/ar.alafasy"
+        arabic_resp = requests.get(arabic_url, timeout=10).json()
+        arabic_text = arabic_resp["data"]["text"] if arabic_resp["status"] == "OK" else "❌"
+
         # বাংলা অর্থ
-        bn_url = f"https://api.alquran.cloud/v1/ayah/{surah_num}:{ayah_num}/bn.bengali"
-        bn_response = requests.get(bn_url, timeout=10).json()
-        bangla = bn_response['data']['text']
-        
-        return arabic, bangla
+        bengali_url = f"https://api.alquran.cloud/v1/ayah/{surah_num}:{ayah_num}/bn.bengali"
+        bengali_resp = requests.get(bengali_url, timeout=10).json()
+        bengali_text = bengali_resp["data"]["text"] if bengali_resp["status"] == "OK" else "❌"
+
+        # উচ্চারণ (transliteration)
+        translit_url = f"https://api.alquran.cloud/v1/ayah/{surah_num}:{ayah_num}/en.transliteration"
+        translit_resp = requests.get(translit_url, timeout=10).json()
+        translit_text = translit_resp["data"]["text"] if translit_resp["status"] == "OK" else "❌"
+
+        return arabic_text, translit_text, bengali_text
     except Exception as e:
-        return "আয়াত পাওয়া যায়নি", "সংযোগ ত্রুটি, আবার চেষ্টা করুন"
+        logging.error(f"API error: {e}")
+        return None, None, None
 
-def get_ayah_buttons(surah, ayah):
-    return InlineKeyboardMarkup([
-        [
-            InlineKeyboardButton("◀ পিছন", callback_data=f"prev_{surah}_{ayah}"),
-            InlineKeyboardButton("পরবর্তী ▶", callback_data=f"next_{surah}_{ayah}")
-        ],
-        [
-            InlineKeyboardButton("🔄 সূরা পাল্টান", callback_data="change_surah"),
-            InlineKeyboardButton("🔍 আয়াত সার্চ", callback_data="search_ayah")
-        ],
-        [InlineKeyboardButton("🏠 মেনুতে ফিরুন", callback_data="main_menu")]
-    ])
-
-def main_menu_keyboard():
-    return InlineKeyboardMarkup([
-        [InlineKeyboardButton("📖 কুরআন পড়ুন", callback_data="read_quran")],
-        [InlineKeyboardButton("🔄 সূরা পরিবর্তন", callback_data="change_surah")],
-        [InlineKeyboardButton("🔍 আয়াত খুঁজুন", callback_data="search_ayah")]
-    ])
+def get_random_ayah():
+    """Random আয়াত আনো"""
+    import random
+    surah = random.choice(SURAHS)
+    ayah_num = random.randint(1, surah[3])
+    return surah[0], surah[1], ayah_num
 
 # ============================================================
-# হ্যান্ডলার
+# মেনু
+# ============================================================
+
+def main_menu():
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("📖 সূরা নির্বাচন", callback_data="surah_list_1"),
+         InlineKeyboardButton("🎲 Random আয়াত", callback_data="random_ayah")],
+        [InlineKeyboardButton("🔢 আয়াত খোঁজো", callback_data="search_ayah"),
+         InlineKeyboardButton("⭐ জনপ্রিয় আয়াত", callback_data="popular")],
+        [InlineKeyboardButton("ℹ️ সাহায্য", callback_data="help")],
+    ])
+
+def surah_list_keyboard(page=1):
+    """সূরার তালিকা — প্রতি পেজে ১০টি"""
+    per_page = 10
+    start = (page-1) * per_page
+    end = start + per_page
+    surahs_page = SURAHS[start:end]
+    
+    keyboard = []
+    for surah in surahs_page:
+        num, name_bn, name_ar, total = surah
+        keyboard.append([InlineKeyboardButton(
+            f"{num}. {name_bn} ({name_ar}) - {total} আয়াত",
+            callback_data=f"surah_{num}_1"
+        )])
+    
+    nav = []
+    if page > 1:
+        nav.append(InlineKeyboardButton("◀️ আগে", callback_data=f"surah_list_{page-1}"))
+    nav.append(InlineKeyboardButton(f"📄 {page}/{(len(SURAHS)+per_page-1)//per_page}", callback_data="noop"))
+    if end < len(SURAHS):
+        nav.append(InlineKeyboardButton("পরে ▶️", callback_data=f"surah_list_{page+1}"))
+    keyboard.append(nav)
+    keyboard.append([InlineKeyboardButton("🏠 মেনু", callback_data="menu")])
+    return InlineKeyboardMarkup(keyboard)
+
+def ayah_keyboard(surah_num, ayah_num, total_ayahs):
+    """আয়াত নেভিগেশন বাটন"""
+    keyboard = []
+    nav = []
+    if ayah_num > 1:
+        nav.append(InlineKeyboardButton("◀️ আগের আয়াত", callback_data=f"ayah_{surah_num}_{ayah_num-1}"))
+    if ayah_num < total_ayahs:
+        nav.append(InlineKeyboardButton("পরের আয়াত ▶️", callback_data=f"ayah_{surah_num}_{ayah_num+1}"))
+    if nav:
+        keyboard.append(nav)
+    keyboard.append([
+        InlineKeyboardButton("📖 সূরায় ফিরো", callback_data=f"surah_{surah_num}_1"),
+        InlineKeyboardButton("🏠 মেনু", callback_data="menu")
+    ])
+    return InlineKeyboardMarkup(keyboard)
+
+# ============================================================
+# জনপ্রিয় আয়াত
+# ============================================================
+
+POPULAR_AYAHS = [
+    (2, 255, "আয়াতুল কুরসি"),
+    (1, 1, "সূরা ফাতিহা - ১ম আয়াত"),
+    (112, 1, "সূরা ইখলাস - ১ম আয়াত"),
+    (36, 1, "সূরা ইয়াসিন - ১ম আয়াত"),
+    (55, 1, "সূরা রাহমান - ১ম আয়াত"),
+    (67, 1, "সূরা মুলক - ১ম আয়াত"),
+    (18, 1, "সূরা কাহফ - ১ম আয়াত"),
+    (2, 286, "সূরা বাকারা - শেষ আয়াত"),
+]
+
+def popular_keyboard():
+    keyboard = []
+    for surah_num, ayah_num, label in POPULAR_AYAHS:
+        keyboard.append([InlineKeyboardButton(
+            f"⭐ {label}", callback_data=f"ayah_{surah_num}_{ayah_num}"
+        )])
+    keyboard.append([InlineKeyboardButton("🏠 মেনু", callback_data="menu")])
+    return InlineKeyboardMarkup(keyboard)
+
+# ============================================================
+# COMMANDS
 # ============================================================
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     name = update.effective_user.first_name
     await update.message.reply_text(
-        f"📖 আসসালামু আলাইকুম, {name}!\n\n"
-        f"পবিত্র কুরআন টেলিগ্রাম বোটে স্বাগতম।\n\n"
-        f"নিচের মেনু থেকে কুরআন পড়া শুরু করুন।",
+        f"بِسْمِ اللهِ الرَّحْمٰنِ الرَّحِيْمِ\n\n"
+        f"আস্সালামু আলাইকুম *{name}* ভাই/আপু! 🌙\n\n"
+        f"স্বাগতম *HSNK কোরআন Bot* এ!\n\n"
+        f"এখানে পাবেন:\n"
+        f"📖 পুরো কোরআনের ১১৪টি সূরা\n"
+        f"🔤 আরবি মূল পাঠ\n"
+        f"🗣️ বাংলা উচ্চারণ\n"
+        f"📝 বাংলা অর্থ\n\n"
+        f"আল্লাহ আমাদের সকলকে কোরআন বোঝার তৌফিক দান করুন। আমিন! 🤲",
         parse_mode="Markdown",
-        reply_markup=main_menu_keyboard()
+        reply_markup=main_menu()
     )
 
+# ============================================================
+# CALLBACK
+# ============================================================
+
 async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    user_id = query.from_user.id
-    user = get_user(user_id)
-    
-    data = query.data
-    
-    # মেনুতে ফেরা
-    if data == "main_menu":
-        await query.edit_message_text(
-            "📖 *পবিত্র কুরআন বোট*\n\nনিচের অপশন বেছে নিন:",
-            parse_mode="Markdown",
-            reply_markup=main_menu_keyboard()
-        )
-        return
-    
-    # কুরআন পড়া শুরু বা চালু রাখা
-    if data == "read_quran":
-        surah = user["surah"]
-        ayah = user["ayah"]
-        arabic, bangla = get_ayah_text(surah, ayah)
-        
-        msg = f"📌 *সূরা {surah_bangla_names.get(surah, surah)} : আয়াত {ayah}*\n\n"
-        msg += f"🔹 *আরবি:*\n{arabic}\n\n"
-        msg += f"🔸 *বাংলা অর্থ:*\n{bangla}"
-        
-        await query.edit_message_text(
-            msg,
-            parse_mode="Markdown",
-            reply_markup=get_ayah_buttons(surah, ayah)
-        )
-        return
-    
-    # পিছনের আয়াত
-    if data.startswith("prev_"):
-        parts = data.split("_")
-        surah = int(parts[1])
-        ayah = int(parts[2])
-        
-        if ayah > 1:
-            ayah -= 1
-        elif surah > 1:
-            surah -= 1
-            ayah = surah_ayah_count.get(surah, 7)
-        
-        user["surah"] = surah
-        user["ayah"] = ayah
-        
-        arabic, bangla = get_ayah_text(surah, ayah)
-        msg = f"📌 *সূরা {surah_bangla_names.get(surah, surah)} : আয়াত {ayah}*\n\n"
-        msg += f"🔹 *আরবি:*\n{arabic}\n\n"
-        msg += f"🔸 *বাংলা অর্থ:*\n{bangla}"
-        
-        await query.edit_message_text(
-            msg,
-            parse_mode="Markdown",
-            reply_markup=get_ayah_buttons(surah, ayah)
-        )
-        return
-    
-    # পরবর্তী আয়াত
-    if data.startswith("next_"):
-        parts = data.split("_")
-        surah = int(parts[1])
-        ayah = int(parts[2])
-        max_ayah = surah_ayah_count.get(surah, 7)
-        
-        if ayah < max_ayah:
-            ayah += 1
-        elif surah < 114:
-            surah += 1
-            ayah = 1
-        
-        user["surah"] = surah
-        user["ayah"] = ayah
-        
-        arabic, bangla = get_ayah_text(surah, ayah)
-        msg = f"📌 *সূরা {surah_bangla_names.get(surah, surah)} : আয়াত {ayah}*\n\n"
-        msg += f"🔹 *আরবি:*\n{arabic}\n\n"
-        msg += f"🔸 *বাংলা অর্থ:*\n{bangla}"
-        
-        await query.edit_message_text(
-            msg,
-            parse_mode="Markdown",
-            reply_markup=get_ayah_buttons(surah, ayah)
-        )
-        return
-    
-    # সূরা পরিবর্তন
-    if data == "change_surah":
-        msg = "সূরা নম্বর লিখুন (1-114):\nউদাহরণ: 112 লিখলে সূরা ইখলাস দেখাবে"
-        await query.edit_message_text(
-            msg,
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🏠 বাতিল", callback_data="main_menu")]])
-        )
-        context.user_data['waiting_for_surah'] = True
-        return
-    
-    # আয়াত সার্চ
-    if data == "search_ayah":
-        msg = "আয়াত নং লিখুন (সূরা:আয়াত ফরম্যাটে)\nউদাহরণ: 2:255 বা 112:2"
-        await query.edit_message_text(
-            msg,
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🏠 বাতিল", callback_data="main_menu")]])
-        )
-        context.user_data['waiting_for_ayah'] = True
+    q = update.callback_query
+    await q.answer()
+    data = q.data
+
+    if data == "noop":
         return
 
+    # মেনু
+    if data == "menu":
+        await q.edit_message_text(
+            "بِسْمِ اللهِ الرَّحْمٰنِ الرَّحِيْمِ\n\n"
+            "📖 *HSNK কোরআন Bot*\n\nকী করতে চান?",
+            parse_mode="Markdown",
+            reply_markup=main_menu()
+        )
+
+    # সূরার তালিকা
+    elif data.startswith("surah_list_"):
+        page = int(data.split("_")[2])
+        await q.edit_message_text(
+            f"📖 *সূরার তালিকা* (পেজ {page})\n\nকোন সূরা পড়তে চান?",
+            parse_mode="Markdown",
+            reply_markup=surah_list_keyboard(page)
+        )
+
+    # সূরা সিলেক্ট
+    elif data.startswith("surah_") and not data.startswith("surah_list"):
+        parts = data.split("_")
+        surah_num = int(parts[1])
+        page = int(parts[2]) if len(parts) > 2 else 1
+        
+        surah = next((s for s in SURAHS if s[0] == surah_num), None)
+        if not surah:
+            return
+        
+        _, name_bn, name_ar, total = surah
+        per_page = 10
+        start = (page-1) * per_page + 1
+        end = min(start + per_page - 1, total)
+        
+        keyboard = []
+        for ayah_num in range(start, end+1):
+            keyboard.append([InlineKeyboardButton(
+                f"আয়াত {ayah_num}", callback_data=f"ayah_{surah_num}_{ayah_num}"
+            )])
+        
+        nav = []
+        if page > 1:
+            nav.append(InlineKeyboardButton("◀️ আগে", callback_data=f"surah_{surah_num}_{page-1}"))
+        if end < total:
+            nav.append(InlineKeyboardButton("পরে ▶️", callback_data=f"surah_{surah_num}_{page+1}"))
+        if nav:
+            keyboard.append(nav)
+        keyboard.append([InlineKeyboardButton("📋 সব সূরা", callback_data="surah_list_1"),
+                         InlineKeyboardButton("🏠 মেনু", callback_data="menu")])
+        
+        await q.edit_message_text(
+            f"📖 *{surah_num}. সূরা {name_bn}*\n"
+            f"*{name_ar}*\n\n"
+            f"মোট আয়াত: {total}\n\nকোন আয়াত পড়তে চান?",
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+
+    # আয়াত দেখাও
+    elif data.startswith("ayah_"):
+        parts = data.split("_")
+        surah_num = int(parts[1])
+        ayah_num = int(parts[2])
+        
+        surah = next((s for s in SURAHS if s[0] == surah_num), None)
+        if not surah:
+            return
+        
+        _, name_bn, name_ar, total = surah
+        
+        await q.edit_message_text(
+            f"⏳ *{name_bn} - আয়াত {ayah_num}* লোড হচ্ছে...",
+            parse_mode="Markdown"
+        )
+        
+        arabic, translit, bengali = get_ayah(surah_num, ayah_num)
+        
+        if not arabic:
+            await q.edit_message_text(
+                "❌ ইন্টারনেট সমস্যা! আবার চেষ্টা করুন।",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔄 আবার", callback_data=data),
+                                                    InlineKeyboardButton("🏠 মেনু", callback_data="menu")]]))
+            return
+        
+        text = (
+            f"📖 *সূরা {name_bn} ({name_ar})*\n"
+            f"*আয়াত: {ayah_num}/{total}*\n\n"
+            f"『 আরবি 』\n"
+            f"{arabic}\n\n"
+            f"『 বাংলা উচ্চারণ 』\n"
+            f"_{translit}_\n\n"
+            f"『 বাংলা অর্থ 』\n"
+            f"{bengali}"
+        )
+        
+        await q.edit_message_text(
+            text,
+            parse_mode="Markdown",
+            reply_markup=ayah_keyboard(surah_num, ayah_num, total)
+        )
+
+    # Random আয়াত
+    elif data == "random_ayah":
+        await q.edit_message_text("⏳ Random আয়াত লোড হচ্ছে...")
+        
+        import random
+        surah = random.choice(SURAHS)
+        surah_num = surah[0]
+        name_bn = surah[1]
+        name_ar = surah[2]
+        total = surah[3]
+        ayah_num = random.randint(1, total)
+        
+        arabic, translit, bengali = get_ayah(surah_num, ayah_num)
+        
+        if not arabic:
+            await q.edit_message_text(
+                "❌ ইন্টারনেট সমস্যা! আবার চেষ্টা করুন।",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔄 আবার", callback_data="random_ayah"),
+                                                    InlineKeyboardButton("🏠 মেনু", callback_data="menu")]]))
+            return
+        
+        text = (
+            f"🎲 *Random আয়াত*\n\n"
+            f"📖 *সূরা {name_bn} ({name_ar})*\n"
+            f"*আয়াত: {ayah_num}/{total}*\n\n"
+            f"『 আরবি 』\n"
+            f"{arabic}\n\n"
+            f"『 বাংলা উচ্চারণ 』\n"
+            f"_{translit}_\n\n"
+            f"『 বাংলা অর্থ 』\n"
+            f"{bengali}"
+        )
+        
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("🎲 আরেকটি Random", callback_data="random_ayah")],
+            [InlineKeyboardButton("📖 এই সূরা পড়ো", callback_data=f"surah_{surah_num}_1"),
+             InlineKeyboardButton("🏠 মেনু", callback_data="menu")]
+        ])
+        await q.edit_message_text(text, parse_mode="Markdown", reply_markup=keyboard)
+
+    # জনপ্রিয় আয়াত
+    elif data == "popular":
+        await q.edit_message_text(
+            "⭐ *জনপ্রিয় আয়াতসমূহ*\n\nকোনটি পড়তে চান?",
+            parse_mode="Markdown",
+            reply_markup=popular_keyboard()
+        )
+
+    # সাহায্য
+    elif data == "help":
+        await q.edit_message_text(
+            "ℹ️ *সাহায্য*\n\n"
+            "📖 *সূরা নির্বাচন* — ১১৪টি সূরার তালিকা\n"
+            "🎲 *Random আয়াত* — যেকোনো আয়াত\n"
+            "⭐ *জনপ্রিয় আয়াত* — আয়াতুল কুরসি সহ বিখ্যাত আয়াত\n\n"
+            "প্রতিটি আয়াতে থাকবে:\n"
+            "🔤 আরবি মূল পাঠ\n"
+            "🗣️ বাংলা উচ্চারণ\n"
+            "📝 বাংলা অর্থ\n\n"
+            "যেকোনো সমস্যায়: @HSNK_TEAM\n\n"
+            "اللهم اجعل القرآن ربيع قلوبنا 🤲",
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🏠 মেনু", callback_data="menu")]]))
+
+    # আয়াত খোঁজো
+    elif data == "search_ayah":
+        await q.edit_message_text(
+            "🔢 *আয়াত খোঁজো*\n\n"
+            "এভাবে লিখুন:\n"
+            "`সূরা নম্বর:আয়াত নম্বর`\n\n"
+            "উদাহরণ:\n"
+            "`2:255` — আয়াতুল কুরসি\n"
+            "`1:1` — সূরা ফাতিহার ১ম আয়াত\n"
+            "`112:1` — সূরা ইখলাস",
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🏠 মেনু", callback_data="menu")]]])
+        )
+
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
     text = update.message.text.strip()
-    user = get_user(user_id)
     
-    # সূরা নম্বর ইনপুট
-    if context.user_data.get('waiting_for_surah'):
-        context.user_data['waiting_for_surah'] = False
+    # সূরা:আয়াত ফরম্যাট চেক
+    if ":" in text:
         try:
-            surah = int(text)
-            if 1 <= surah <= 114:
-                user["surah"] = surah
-                user["ayah"] = 1
-                
-                arabic, bangla = get_ayah_text(surah, 1)
-                msg = f"📌 *সূরা {surah_bangla_names.get(surah, surah)} : আয়াত 1*\n\n"
-                msg += f"🔹 *আরবি:*\n{arabic}\n\n"
-                msg += f"🔸 *বাংলা অর্থ:*\n{bangla}"
-                
+            parts = text.split(":")
+            surah_num = int(parts[0])
+            ayah_num = int(parts[1])
+            
+            surah = next((s for s in SURAHS if s[0] == surah_num), None)
+            if not surah or ayah_num < 1 or ayah_num > surah[3]:
                 await update.message.reply_text(
-                    msg,
-                    parse_mode="Markdown",
-                    reply_markup=get_ayah_buttons(surah, 1)
+                    "❌ সঠিক নম্বর দিন!\nযেমন: `2:255`",
+                    parse_mode="Markdown"
                 )
-            else:
-                await update.message.reply_text("❌ সূরা 1 থেকে 114 এর মধ্যে লিখুন।")
+                return
+            
+            msg = await update.message.reply_text("⏳ লোড হচ্ছে...")
+            arabic, translit, bengali = get_ayah(surah_num, ayah_num)
+            
+            if not arabic:
+                await msg.edit_text("❌ ইন্টারনেট সমস্যা! আবার চেষ্টা করুন।")
+                return
+            
+            name_bn = surah[1]
+            name_ar = surah[2]
+            total = surah[3]
+            
+            text_out = (
+                f"📖 *সূরা {name_bn} ({name_ar})*\n"
+                f"*আয়াত: {ayah_num}/{total}*\n\n"
+                f"『 আরবি 』\n{arabic}\n\n"
+                f"『 বাংলা উচ্চারণ 』\n_{translit}_\n\n"
+                f"『 বাংলা অর্থ 』\n{bengali}"
+            )
+            await msg.edit_text(
+                text_out, parse_mode="Markdown",
+                reply_markup=ayah_keyboard(surah_num, ayah_num, total)
+            )
+            return
         except:
-            await update.message.reply_text("❌ সঠিক সূরা নম্বর লিখুন (শুধু সংখ্যা)")
-        return
+            pass
     
-    # আয়াত সার্চ ইনপুট
-    if context.user_data.get('waiting_for_ayah'):
-        context.user_data['waiting_for_ayah'] = False
-        try:
-            if ":" in text:
-                surah, ayah = text.split(":")
-                surah = int(surah)
-                ayah = int(ayah)
-                if 1 <= surah <= 114 and ayah >= 1:
-                    max_ayah = surah_ayah_count.get(surah, 7)
-                    if ayah <= max_ayah:
-                        user["surah"] = surah
-                        user["ayah"] = ayah
-                        
-                        arabic, bangla = get_ayah_text(surah, ayah)
-                        msg = f"📌 *সূরা {surah_bangla_names.get(surah, surah)} : আয়াত {ayah}*\n\n"
-                        msg += f"🔹 *আরবি:*\n{arabic}\n\n"
-                        msg += f"🔸 *বাংলা অর্থ:*\n{bangla}"
-                        
-                        await update.message.reply_text(
-                            msg,
-                            parse_mode="Markdown",
-                            reply_markup=get_ayah_buttons(surah, ayah)
-                        )
-                    else:
-                        await update.message.reply_text(f"❌ সূরা {surah} -তে {max_ayah}টি আয়াত আছে।")
-                else:
-                    await update.message.reply_text("❌ সঠিক ফরম্যাট: সূরা:আয়াত (যেমন: 2:255)")
-            else:
-                await update.message.reply_text("❌ ফরম্যাট: সূরা:আয়াত (যেমন: 112:2)")
-        except:
-            await update.message.reply_text("❌ ত্রুটি! সঠিক ফরম্যাট: সূরা:আয়াত")
-        return
-    
-    # অন্য যেকোনো টেক্সট
     await update.message.reply_text(
-        "👇 মেনু থেকে অপশন বেছে নিন:",
-        reply_markup=main_menu_keyboard()
+        "📖 *HSNK কোরআন Bot*\n\nমেনু থেকে বেছে নিন!",
+        parse_mode="Markdown",
+        reply_markup=main_menu()
     )
 
 def main():
@@ -297,9 +429,7 @@ def main():
     app.add_handler(CommandHandler("start", start_command))
     app.add_handler(CallbackQueryHandler(callback))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
-    
-    print("🤖 কুরআন বোট চালু হয়েছে!")
-    print("টোকেন:", BOT_TOKEN[:20] + "...")
+    print("📖 HSNK কোরআন Bot চালু!")
     app.run_polling(allowed_updates=Update.ALL_TYPES)
 
 if __name__ == '__main__':
