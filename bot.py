@@ -56,23 +56,50 @@ SURAHS = [
 # API ফাংশন
 # ============================================================
 
+def english_to_bangla_phonetic(text):
+    """ইংরেজি উচ্চারণকে বাংলা হরফে রূপান্তর"""
+    import re
+    replacements = [
+        ("aa", "আ"), ("ee", "ই"), ("oo", "উ"), ("uu", "উ"),
+        ("ai", "আই"), ("au", "আউ"), ("ay", "আই"), ("aw", "আও"),
+        ("gh", "গ"), ("kh", "খ"), ("sh", "শ"), ("th", "স"),
+        ("dh", "দ"), ("zh", "য"), ("ch", "চ"),
+        ("a", "া"), ("b", "ব"), ("d", "দ"), ("e", "ে"),
+        ("f", "ফ"), ("g", "গ"), ("h", "হ"), ("i", "ি"),
+        ("j", "জ"), ("k", "ক"), ("l", "ল"), ("m", "ম"),
+        ("n", "ন"), ("o", "ো"), ("p", "প"), ("q", "ক"),
+        ("r", "র"), ("s", "স"), ("t", "ত"), ("u", "ু"),
+        ("v", "ভ"), ("w", "ও"), ("x", "ক্স"), ("y", "য়"),
+        ("z", "য"),
+    ]
+    result = text.lower()
+    result = re.sub(r"\ba", "আ", result)
+    result = re.sub(r"\bi", "ই", result)
+    result = re.sub(r"\bu", "উ", result)
+    result = re.sub(r"\be", "এ", result)
+    result = re.sub(r"\bo", "ও", result)
+    for en, bn in replacements:
+        result = result.replace(en, bn)
+    return result
+
 def get_ayah(surah_num, ayah_num):
-    """আরবি, বাংলা অর্থ ও উচ্চারণ আনো"""
+    """আরবি, বাংলা উচ্চারণ ও অর্থ আনো"""
     try:
-        # আরবি
-        arabic_url = f"https://api.alquran.cloud/v1/ayah/{surah_num}:{ayah_num}/ar.alafasy"
-        arabic_resp = requests.get(arabic_url, timeout=10).json()
+        arabic_resp = requests.get(
+            f"https://api.alquran.cloud/v1/ayah/{surah_num}:{ayah_num}/ar.alafasy", timeout=10
+        ).json()
         arabic_text = arabic_resp["data"]["text"] if arabic_resp["status"] == "OK" else "❌"
 
-        # বাংলা অর্থ
-        bengali_url = f"https://api.alquran.cloud/v1/ayah/{surah_num}:{ayah_num}/bn.bengali"
-        bengali_resp = requests.get(bengali_url, timeout=10).json()
+        bengali_resp = requests.get(
+            f"https://api.alquran.cloud/v1/ayah/{surah_num}:{ayah_num}/bn.bengali", timeout=10
+        ).json()
         bengali_text = bengali_resp["data"]["text"] if bengali_resp["status"] == "OK" else "❌"
 
-        # উচ্চারণ (transliteration)
-        translit_url = f"https://api.alquran.cloud/v1/ayah/{surah_num}:{ayah_num}/en.transliteration"
-        translit_resp = requests.get(translit_url, timeout=10).json()
-        translit_text = translit_resp["data"]["text"] if translit_resp["status"] == "OK" else "❌"
+        translit_resp = requests.get(
+            f"https://api.alquran.cloud/v1/ayah/{surah_num}:{ayah_num}/en.transliteration", timeout=10
+        ).json()
+        translit_en = translit_resp["data"]["text"] if translit_resp["status"] == "OK" else ""
+        translit_text = english_to_bangla_phonetic(translit_en)
 
         return arabic_text, translit_text, bengali_text
     except Exception as e:
@@ -92,8 +119,7 @@ def get_random_ayah():
 
 def main_menu():
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton("📖 সূরা নির্বাচন", callback_data="surah_list_1"),
-         InlineKeyboardButton("🎲 Random আয়াত", callback_data="random_ayah")],
+        [InlineKeyboardButton("📖 সূরা নির্বাচন", callback_data="surah_list_1")],
         [InlineKeyboardButton("🔢 আয়াত খোঁজো", callback_data="search_ayah"),
          InlineKeyboardButton("⭐ জনপ্রিয় আয়াত", callback_data="popular")],
         [InlineKeyboardButton("ℹ️ সাহায্য", callback_data="help")],
